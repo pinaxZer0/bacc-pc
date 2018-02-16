@@ -133,7 +133,7 @@ class Baijiale extends TableBase {
 			user.coins=gd.deal[user.id].user.coins;
 			gd.deal[user.id].user=user;
 		}
-		var o=this.mk_transfer_gamedata(this.gamedata);
+		var o=this.mk_transfer_gamedata(this.gamedata, user.id);
 		var gamedata=o.gamedata||o.scene;
 		gamedata.$={init:true};
 		o.seq=1;
@@ -152,7 +152,7 @@ class Baijiale extends TableBase {
 		if (obj.enroll) {
 			var a=0;
 		}
-		if (!obj.deal && !obj.seats && !obj.playerBanker && !obj.enroll) return {scene:obj};
+		if (!obj.deal && !obj.seats && !obj.playerBanker && !obj.enroll && !obj.his) return {scene:obj};
 		obj=clone(obj);
 		if (obj.deal) {
 			if (!obj.seats) obj.seats={};
@@ -186,6 +186,15 @@ class Baijiale extends TableBase {
 			for (var i in obj.enroll) {
 				var u=obj.enroll[i];
 				obj.enroll[i]={id:u.id, nickname:u.nickname, coins:u.coins};
+			}
+		}
+		if (obj.his) {
+			for (var i in obj.his) {
+				var item=obj.his[i].deal;
+				if (!item) continue;
+				item.zhuang=item.zhuang[idx];
+				item.xian=item.xian[idx];
+				item.he=item.he[idx];
 			}
 		}
 		return {scene:obj};
@@ -447,6 +456,14 @@ class Baijiale extends TableBase {
 		this.gamedata.status=GAME_STATUS.JIESUAN;
 		var self=this, gd=this.gamedata;
 		var r=gd.his[gd.his.length-1];
+		// 把下注信息也存起来
+		r.deal={zhuang:{}, xian:{}, he:{}};
+		for (var id in gd.deal) {
+			var d=gd.deal[id];
+			if (d.zhuang) r.deal.zhuang[id]=d.zhuang;
+			if (d.xian) r.deal.xian[id]=d.xian;
+			if (d.he) r.deal.he[id]=d.he;
+		}
 		var winArr=[], loseArr, tieArr=[];
 		if (r.win=='tie') {
 			winArr.push('he');
