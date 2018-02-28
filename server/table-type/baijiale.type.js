@@ -333,7 +333,7 @@ class Baijiale extends TableBase {
 			return (gd.opt.maxZhu-(Math.abs((total.xian+pack.xian)*factor.xian-(total.zhuang+pack.zhuang)*factor.zhuang)+(total.xianDui+pack.xianDui)*factor.xianDui+(total.zhuangDui+pack.zhuangDui)*factor.zhuangDui));
 		}
 		function handleXiazhu(pack, user) {
-			if (!gd.playerBanker) return user.senderr('无人坐庄，禁止下注');
+			// if (!gd.playerBanker) return user.senderr('无人坐庄，禁止下注');
 			if (user==gd.playerBanker) return;
 			var deal=gd.deal[user.id];
 			if (!deal) {
@@ -616,10 +616,10 @@ class Baijiale extends TableBase {
 					next();
 				});
 			}
-			else next();
+			else setTimeout(next, 100);
 		})(function() {
-			if (gd.game.leftCards<14) {
-			// if (gd.setnum>=3) {
+			// if (gd.game.leftCards<14) {
+			if (gd.setnum>=3) {
 				self.newgame();
 			}else self.newround();
 			var delay=1800;
@@ -634,7 +634,9 @@ class Baijiale extends TableBase {
 			delay+=500; //give coins;
 			delay+=500; //to player
 			delay+=4000;
-			setTimeout(cb, delay);
+			setTimeout(function() {
+				cb();
+			}, delay);
 		});
 	}
 	isPlayerBanker() {
