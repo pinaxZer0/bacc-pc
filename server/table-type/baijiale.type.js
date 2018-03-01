@@ -333,7 +333,7 @@ class Baijiale extends TableBase {
 			return (gd.opt.maxZhu-(Math.abs((total.xian+pack.xian)*factor.xian-(total.zhuang+pack.zhuang)*factor.zhuang)+(total.xianDui+pack.xianDui)*factor.xianDui+(total.zhuangDui+pack.zhuangDui)*factor.zhuangDui));
 		}
 		function handleXiazhu(pack, user) {
-			// if (!gd.playerBanker) return user.senderr('无人坐庄，禁止下注');
+			if (!gd.playerBanker) return user.senderr('无人坐庄，禁止下注');
 			if (user==gd.playerBanker) return;
 			var deal=gd.deal[user.id];
 			if (!deal) {
