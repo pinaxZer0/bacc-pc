@@ -618,8 +618,8 @@ class Baijiale extends TableBase {
 			}
 			else setTimeout(next, 100);
 		})(function() {
-			// if (gd.game.leftCards<14) {
-			if (gd.setnum>=3) {
+			if (gd.game.leftCards<14) {
+			// if (gd.setnum>=3) {
 				self.newgame();
 			}else self.newround();
 			var delay=1800;
