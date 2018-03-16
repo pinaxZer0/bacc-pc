@@ -536,6 +536,7 @@ class Baijiale extends TableBase {
 		if (this.isPlayerBanker()) {
 			updObj.seats[gd.playerBanker.id]={user:gd.playerBanker};
 			if (profit>0) {
+				r.deal[parseWin(r)][gd.playerBanker.id]='playerBanker';
 				var p=Math.round(profit*waterRatio);
 				water+=(profit-p);
 				// 如果是人的庄,抽水后给他
@@ -698,4 +699,14 @@ function modifyUserCoins(user, delta) {
 	user.send({user:{coins:user.dbuser.coins}});
 }
 
+function parseWin(r) {
+	switch(r.win) {
+		case "tie":
+		return 'he';
+		case 'player':
+		return 'xian';
+		case 'banker':
+		return 'zhuang'
+	}
+}
 module.exports=Baijiale;
