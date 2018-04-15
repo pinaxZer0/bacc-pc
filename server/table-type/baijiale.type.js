@@ -99,6 +99,7 @@ class Baijiale extends TableBase {
 		// if (this.gamedata.playerBanker==user) this.playerBankerWantQuit=user.id;
 		this.msgDispatcher.emit('userleave', user);
 		this.quit(user);
+		this.broadcast({c:'table.chat', role:'提示', str:user.nickname+'离开了'});
 	}
 	enter(user) {
 		if (this.quitTimer) clearTimeout(this.quitTimer);
@@ -140,6 +141,7 @@ class Baijiale extends TableBase {
 		user.send(o);
 		user.send({c:'table.chat', role:'提示', str:'挂帅条件：200,0000<br>区域限制： 1,0000,0000<br>玩家限制：5000,0000<br>庄赔率： 1.98<br>闲赔率:  2.02<br>庄对，闲对赔率: 12.00', seq:1});
 		this.broadcast({c:'table.userin', id:user.id, nickname:user.nickname, level:user.level, face:user.dbuser.face, seat:seat});
+		this.broadcast({c:'table.chat', role:'提示', str:user.nickname+'进来了'});
 		user.offline=false;
 		this.msgDispatcher.emit('userin', user);
 
