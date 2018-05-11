@@ -313,10 +313,12 @@ class User extends EventEmitter {
 	set coins(n) {
 		this.dbuser.coins=n;
 		this.send({user:{coins:n}});
+		this.table && this.table.broadcast({c:'table.uc', id:this.dbuser._id, coins:n, lockedCoins:this._lockedCoins}, this);
 	}
 	set lockedCoins(n) {
 		this._lockedCoins=n;
 		this.send({user:{lockedCoins:n}});
+		this.table && this.table.broadcast({c:'table.uc', id:this.dbuser._id, coins:this.dbuser.coins, lockedCoins:n}, this);
 	}
 	get lockedCoins() {
 		return this._lockedCoins;
@@ -405,6 +407,9 @@ class User extends EventEmitter {
 	msg(pack) {
 		var self=this;
 		switch(pack.c) {
+			case 'tic':
+				self.send({c:'tac', _t:new Date()});
+			break;
 			case 'entergame':
 				if (pack.opt.fangka>this.tickets) {
 					return this.senderr({message:'创建这个房间需要'+pack.opt.fangka+'张房卡，请先购买房卡', win:'BuyTicketsWin'});

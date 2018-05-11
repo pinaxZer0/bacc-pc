@@ -121,7 +121,8 @@ function afterUserInStep2(err, pack, ws, dbuser) {
 	}
 	else {
 		ws.user=oldUser;
-		oldUser.send({c:'kicked', reason:'账号在其他地方登录了'});
+		oldUser.send({c:'kicked', reason:'账号在其他地方登录了',view:'login'});
+		oldUser.ws.user=null;
 		oldUser.ws.close();
 		oldUser.ws=ws;
 		oldUser.offline=false;

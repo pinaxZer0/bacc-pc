@@ -99,7 +99,7 @@ class Baijiale extends TableBase {
 		// if (this.gamedata.playerBanker==user) this.playerBankerWantQuit=user.id;
 		this.msgDispatcher.emit('userleave', user);
 		this.quit(user);
-		this.broadcast({c:'table.chat', role:'提示', str:user.nickname+'离开了'});
+		// this.broadcast({c:'table.chat', role:'提示', str:user.nickname+'离开了'});
 	}
 	enter(user) {
 		if (this.quitTimer) clearTimeout(this.quitTimer);
@@ -141,7 +141,7 @@ class Baijiale extends TableBase {
 		user.send(o);
 		user.send({c:'table.chat', role:'提示', str:'挂帅条件：200,0000<br>区域限制： 1,0000,0000<br>玩家限制：5000,0000<br>庄赔率： 1.98<br>闲赔率:  2.02<br>庄对，闲对赔率: 12.00', seq:1});
 		this.broadcast({c:'table.userin', id:user.id, nickname:user.nickname, level:user.level, face:user.dbuser.face, seat:seat});
-		this.broadcast({c:'table.chat', role:'提示', str:user.nickname+'进来了'});
+		// this.broadcast({c:'table.chat', role:'提示', str:user.nickname+'进来了'});
 		user.offline=false;
 		this.msgDispatcher.emit('userin', user);
 
@@ -282,11 +282,16 @@ class Baijiale extends TableBase {
 	adjustXianhong(cb) {
 		var pb=this.gamedata.playerBanker;
 		if (!pb) {
-			this.gamedata.opt.minZhu=100;
-			this.gamedata.opt.maxZhu=200000;
-			this.gamedata.opt.minDui=100;
-			this.gamedata.opt.maxDui=Math.floor(this.gamedata.opt.maxZhu/factor.xianDui/100)*100;
-			this.gamedata.opt.maxHe=Math.floor(this.gamedata.opt.maxZhu/factor.he/100)*100;
+			// this.gamedata.opt.minZhu=100;
+			// this.gamedata.opt.maxZhu=200000;
+			// this.gamedata.opt.minDui=100;
+			// this.gamedata.opt.maxDui=Math.floor(this.gamedata.opt.maxZhu/factor.xianDui/100)*100;
+			// this.gamedata.opt.maxHe=Math.floor(this.gamedata.opt.maxZhu/factor.he/100)*100;
+			this.gamedata.opt.minZhu=0;
+			this.gamedata.opt.maxZhu=0;
+			this.gamedata.opt.minDui=0;
+			this.gamedata.opt.maxDui=0;
+			this.gamedata.opt.maxHe=0;
 		} else {
 			var u=pb;
 			var reasonableZhu=u.coins;//Math.floor(u.coins/1000000)*1000000;
@@ -699,6 +704,7 @@ class Baijiale extends TableBase {
 function modifyUserCoins(user, delta) {
 	user.dbuser.coins+=delta;
 	user.send({user:{coins:user.dbuser.coins}});
+	user.send({c:'table.userprofit', d:delta});
 }
 
 function parseWin(r) {
