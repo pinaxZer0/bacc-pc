@@ -2,7 +2,7 @@
 require('colors');
 
 var TableBase=require('./tablebase.js');
-var async=require('async'), merge=require('gy-merge'), clone=require('clone');
+var async=require('async'), merge=require('gy-merge'), clone=require('clone'), filter=require('filter-object');
 var Game=require('./gamerule');
 var debugout=require('debugout')(require('yargs').argv.debugout);
 var _=require('lodash');
@@ -134,7 +134,7 @@ class Baijiale extends TableBase {
 			user.coins=gd.deal[user.id].user.coins;
 			gd.deal[user.id].user=user;
 		}
-		var o=this.mk_transfer_gamedata(this.gamedata, user.id);
+		var o=this.mk_transfer_gamedata(this.gamedata, user.id, true);
 		var gamedata=o.gamedata||o.scene;
 		gamedata.$={init:true};
 		o.seq=1;
@@ -147,7 +147,7 @@ class Baijiale extends TableBase {
 
 		if (user.savedMoney>0 && !user.dbuser.secpwd) user.send({c:'table.chat', role:'消息', str:'您的保险柜有入账，请设置保险柜密码领取'});
 	}
-	mk_transfer_gamedata(obj, idx) {
+	mk_transfer_gamedata(obj, idx, isInit) {
 		// 简化user对象，只传输id nickname face level score
 		//console.log(JSON.stringify(obj));
 		var self = this;
@@ -157,7 +157,7 @@ class Baijiale extends TableBase {
 		if (!obj.deal && !obj.seats && !obj.playerBanker && !obj.enroll && !obj.his) return {scene:obj};
 		obj=clone(obj);
 		if (obj.deal) {
-			if (!obj.seats) obj.seats={};
+			// if (!obj.seats) obj.seats={};
 			for (var i in obj.deal) {
 				// var u=this.scene.seats[i].user;
 				// obj.seats[i]={};
@@ -172,8 +172,7 @@ class Baijiale extends TableBase {
 					continue;
 				}
 				var u=seat.user;
-				if (u) {
-					obj.seats[i]=obj.seats[i]||{};
+				if (u && obj.seats[i].user) {
 					obj.seats[i].user={id:u.id, nickname:u.nickname, face:u.dbuser.face, coins:u.coins, level:u.level, offline:seat.offline, showId:u.showId, profit:u.profit, bankerSets:u.bankerSets, setprofit:u.setprofit, memo:u.memo, total_set:u.dbuser.total_set};
 				} 
 			}
@@ -199,6 +198,113 @@ class Baijiale extends TableBase {
 				item.he=item.he[idx];
 			}
 		}
+		// var checklist=(obj.$?obj.$.set:null);
+		// if (!checklist) return {scene:obj};
+
+		// for (var ci=0; ci<checklist.length; ci++) {
+		// 	var item=checklist[ci];
+		// 	if (!Array.isArray(item)) continue;
+		// 	switch(item[0]) {
+		// 	case 'deal':
+		// 		for (var i in obj.deal) {
+		// 			obj.deal[i].user=undefined;
+		// 		}
+		// 	break;
+		// 	case 'seats':
+		// 		if (item[2]=='user') {
+		// 			var uid=item[1];
+		// 			var seat =this.scene.seats[uid];
+		// 			if (!seat) break;
+		// 			var u=seat.user;
+		// 			// set seats.xx.user={};
+		// 			if (item.length==3) {
+		// 				obj.seats[uid].user={id:u.id, nickname:u.nickname, face:u.dbuser.face, coins:u.coins, level:u.level, offline:seat.offline, showId:u.showId, profit:u.profit, bankerSets:u.bankerSets, setprofit:u.setprofit, memo:u.memo, total_set:u.dbuser.total_set};
+		// 			} else {
+		// 				var obju=obj.seats[uid].user;
+		// 				var obju=obj.seats[uid].user=filter(obj.seats[uid].user, ['id', 'nickname', 'face', 'coins', 'level', 'showId', 'profit', 'bankerSets', 'setprofit', 'memo']);
+		// 				obju.offline=seat.offline;
+		// 				obju.total_set=u.dbuser.total_set;
+		// 			}
+		// 		}
+		// 	break;
+		// 	case 'playerBanker':
+		// 		var u=this.scene.playerBanker;
+		// 		if (!u) delete obj.playerBanker;
+		// 		else obj.playerBanker={id:u.id, nickname:u.nickname, coins:u.coins, bankerSets:u.bankerSets, profit:u.profit};
+		// 	break;
+		// 	case 'enroll':
+		// 		var uid=item[1];
+		// 		obj.enroll[uid]={id:u.id, nickname:u.nickname, coins:u.coins};
+		// 	break;
+		// 	case 'his':
+		// 		var hisidx=item[1];
+		// 		var hisitem=obj.his[hisidx].deal;
+		// 		if (!hisitem) continue;
+		// 		hisitem.zhuang=hisitem.zhuang[idx];
+		// 		hisitem.xian=hisitem.xian[idx];
+		// 		hisitem.he=hisitem.he[idx];
+		// 	break;
+		// 	}
+		// }
+		// obj=clone(obj);
+		// if (obj.deal) {
+		// 	if (!obj.seats) obj.seats={};
+		// 	for (var i in obj.deal) {
+		// 		// var u=this.scene.seats[i].user;
+		// 		// obj.seats[i]={};
+		// 		delete obj.deal[i].user;
+		// 	}
+		// }
+		// if (obj.seats) {
+		// 	for (var i in obj.seats) {
+		// 		var seat =this.scene.seats[i];
+		// 		if (!seat) {
+		// 			obj.seats[i]=undefined;
+		// 			continue;
+		// 		}
+		// 		var u=seat.user;
+		// 		// only attrs listed here will be transferd
+		// 		if (isInit) {
+		// 			obj.seats[i].user={id:u.id, nickname:u.nickname, face:u.dbuser.face, coins:u.coins, level:u.level, offline:seat.offline, showId:u.showId, profit:u.profit, bankerSets:u.bankerSets, setprofit:u.setprofit, memo:u.memo, total_set:u.dbuser.total_set};
+		// 		}
+		// 		else {
+		// 			obj.seats[i].user=filter(obj.seats[i].user, ['id', 'nickname', 'face', 'coins', 'level', 'showId', 'profit', 'bankerSets', 'setprofit', 'memo']);
+		// 			obj.seats[i].user.offline=seat.offline;
+		// 			obj.seats[i].user.total_set=u.dbuser.total_set;
+		// 		}
+		// 		// var seat =this.scene.seats[i];
+		// 		// if (!seat) {
+		// 		// 	obj.seats[i]=undefined;
+		// 		// 	continue;
+		// 		// }
+		// 		// var u=seat.user;
+		// 		// if (u) {
+		// 		// 	obj.seats[i]=obj.seats[i]||{};
+		// 		// 	obj.seats[i].user={id:u.id, nickname:u.nickname, face:u.dbuser.face, coins:u.coins, level:u.level, offline:seat.offline, showId:u.showId, profit:u.profit, bankerSets:u.bankerSets, setprofit:u.setprofit, memo:u.memo, total_set:u.dbuser.total_set};
+		// 		// } 
+		// 	}
+		// }
+		// if (obj.playerBanker) {
+		// 	// debugout('upd playerBanker'.cyan, this.scene.playerBanker.bankerSets);
+		// 	var u=this.scene.playerBanker;
+		// 	if (!u) delete obj.playerBanker;
+		// 	else obj.playerBanker={id:u.id, nickname:u.nickname, coins:u.coins, bankerSets:u.bankerSets, profit:u.profit};
+		// }
+		// if (obj.enroll) {
+		// 	for (var i in obj.enroll) {
+		// 		var u=obj.enroll[i];
+		// 		obj.enroll[i]={id:u.id, nickname:u.nickname, coins:u.coins};
+		// 	}
+		// }
+		// if (obj.his) {
+		// 	for (var i in obj.his) {
+		// 		var item=obj.his[i].deal;
+		// 		if (!item) continue;
+		// 		item.zhuang=item.zhuang[idx];
+		// 		item.xian=item.xian[idx];
+		// 		item.he=item.he[idx];
+		// 	}
+		// }
 		return {scene:obj};
 	}
 	newgame() {
@@ -540,6 +646,7 @@ class Baijiale extends TableBase {
 			user_win_list.push({user:u, deal:deal, win:userwin, lose:userlose});
 		}
 		// profit里是庄家的盈利，庄盈利
+		var banker_profit=null;
 		if (this.isPlayerBanker()) {
 			updObj.seats[gd.playerBanker.id]={user:gd.playerBanker};
 			if (profit>0) {
@@ -547,7 +654,8 @@ class Baijiale extends TableBase {
 				var p=Math.round(profit*waterRatio);
 				water+=(profit-p);
 				// 如果是人的庄,抽水后给他
-				modifyUserCoins(gd.playerBanker, p);
+				banker_profit=p;
+				//modifyUserCoins(gd.playerBanker, p);
 				// gd.playerBanker.coins+=p;
 				gd.playerBanker.profit+=p;
 				debugout('banker win(profit, minus water, total)', profit, p,gd.playerBanker.profit);
@@ -566,7 +674,8 @@ class Baijiale extends TableBase {
 						if (user_win_list[i].win) user_win_list[i].win=Math.floor(adjustR*user_win_list[i].win);
 					}
 				}
-				modifyUserCoins(gd.playerBanker, profit);
+				banker_profit=profit;
+				// modifyUserCoins(gd.playerBanker, profit);
 				// gd.playerBanker.coins+=profit;
 				gd.playerBanker.profit+=profit;
 				debugout('banker win(profit, total)', profit, gd.playerBanker.profit);
@@ -577,75 +686,104 @@ class Baijiale extends TableBase {
 		} else {
 			this.broadcast({c:'bankerprofit', p:profit});
 		}
-		// send user profit
-		for (var i=0; i<user_win_list.length; i++) {
-			var obj=user_win_list[i];
-			var delta=0;
-			if (obj.win>0) {
-				var d=Math.round(waterRatio*obj.win);
-				water+=(obj.win-d);
-				delta+=d;
-			}
-			delta-=obj.lose;
-			var orgCoins=obj.user.coins;
-			obj.user.send({c:'setprofit', p:delta});
-			modifyUserCoins(obj.user, delta);
-			var newCoins=obj.user.coins;
-			var u=obj.deal.user;
-			obj.deal.user=undefined;
-			g_db.games.insert({user:obj.user.id, deal:obj.deal, r:r, oldCoins:orgCoins, newCoins:newCoins, t:now});
-			debugout('user score'.cyan, delta, obj.user.coins);
-			obj.deal.user=u;
-		}
+
 		// this.profits.push({water:water, profit:profit, t:now, set:gd.setnum /*, playerSet:isPlayerBanker()*/});
 		debugout('sys win(profit, water)', profit, water);
 		this.profits.sum+=profit+water;
 		srv_state.total_profit+=profit+water;
-
-		gd.setnum++;
-		for (var i in updObj.seats) {
-			var seat=gd.seats[i];
-			if (seat) {
-				if (seat.user) {
-					if (!seat.user.dbuser.total_set) seat.user.dbuser.total_set=1;
-					else seat.user.dbuser.total_set++;
-				}
-				var o=self.mk_transfer_gamedata(updObj, i);
-				o.seq=1;
-				o.jiesuan=true;
-				// seat.user.send(o);
-			}
-		}	
-		(function(next) {
-			if (self.allusers().length==0) {
-				debugout(self.roomid, 'no enough user');
-				// wait user enter to continue
-				self.msgDispatcher.once('userin', function() {
-					next();
+		var write_statistic=new Promise(function(resolve, reject) {
+			var dr=g_db.dailyreport;
+			dr.count().then((_count)=> {
+				if (_count<=1) _count=1;
+				dr.find().skip(_count-1).toArray((err, r) => {
+					if (err) {
+						console.log(err);
+						return resolve();
+					}
+					var now=new Date();
+					if (r.length==0 || !(r[0].time instanceof Date) || now.getDate()!=r[0].time.getDate()) {
+						g_db.users.aggregate([{$group:{_id:null, tot:{$sum:{$add:['$coins', '$savedMoney']}}}}]).toArray((err, tot_r) =>{
+							if (err) console.log(err);
+							else dr.insert({time:now, totalcoins:tot_r[0].tot, profit:profit+water, adminAdd:0});
+							resolve();
+						})
+					} else {
+						dr.update({_id:r[0]._id}, {$inc:{profit:profit+water}});
+						resolve();
+					}
 				});
-			}
-			else setTimeout(next, 100);
-		})(function() {
-			if (gd.game.leftCards<14) {
-			// if (gd.setnum>=3) {
-				self.newgame();
-			}else self.newround();
-			var delay=1800;
-			if (gd.game.player.cards.length==2) delay+=1200;
-			else delay+=1800;
-			if (gd.game.banker.cards.length==2) delay+=1200;
-			else delay+=1800;
-			delay+=1500;
-			if (r.playerPair) delay+=1300; //pairs
-			if (r.bankerPair) delay+=1300;
-			delay+=500; //take coin
-			delay+=500; //give coins;
-			delay+=500; //to player
-			delay+=4000;
-			setTimeout(function() {
-				cb();
-			}, delay);
+			})	
 		});
+		write_statistic.then(()=>{
+			debugout('after statistic');
+			if (banker_profit) modifyUserCoins(gd.playerBanker, banker_profit);
+			// send user profit
+			for (var i=0; i<user_win_list.length; i++) {
+				var obj=user_win_list[i];
+				var delta=0;
+				if (obj.win>0) {
+					var d=Math.round(waterRatio*obj.win);
+					water+=(obj.win-d);
+					delta+=d;
+				}
+				delta-=obj.lose;
+				var orgCoins=obj.user.coins;
+				obj.user.send({c:'setprofit', p:delta});
+				modifyUserCoins(obj.user, delta);
+				var newCoins=obj.user.coins;
+				var u=obj.deal.user;
+				obj.deal.user=undefined;
+				g_db.games.insert({user:obj.user.id, deal:obj.deal, r:r, oldCoins:orgCoins, newCoins:newCoins, t:now});
+				debugout('user score'.cyan, delta, obj.user.coins);
+				obj.deal.user=u;
+			}
+			gd.setnum++;
+			for (var i in updObj.seats) {
+				var seat=gd.seats[i];
+				if (seat) {
+					if (seat.user) {
+						if (!seat.user.dbuser.total_set) seat.user.dbuser.total_set=1;
+						else seat.user.dbuser.total_set++;
+					}
+					var o=self.mk_transfer_gamedata(updObj, i ,true);
+					o.seq=1;
+					o.jiesuan=true;
+					seat.user.send(o);
+				}
+			}	
+			(function(next) {
+				if (self.allusers().length==0) {
+					debugout(self.roomid, 'no enough user');
+					// wait user enter to continue
+					self.msgDispatcher.once('userin', function() {
+						next();
+					});
+				}
+				else setTimeout(next, 100);
+			})(function() {
+				debugout('prepare next set');
+				if (gd.game.leftCards<14) {
+				// if (gd.setnum>=3) {
+					self.newgame();
+				}else self.newround();
+				var delay=1800;
+				if (gd.game.player.cards.length==2) delay+=1200;
+				else delay+=1800;
+				if (gd.game.banker.cards.length==2) delay+=1200;
+				else delay+=1800;
+				delay+=1500;
+				if (r.playerPair) delay+=1300; //pairs
+				if (r.bankerPair) delay+=1300;
+				delay+=500; //take coin
+				delay+=500; //give coins;
+				delay+=500; //to player
+				delay+=4000;
+				setTimeout(function() {
+					debugout('start next');
+					cb();
+				}, delay);
+			});
+		})
 	}
 	isPlayerBanker() {
 		return (this.gamedata.playerBanker!=null);
@@ -703,8 +841,8 @@ class Baijiale extends TableBase {
 
 function modifyUserCoins(user, delta) {
 	user.dbuser.coins+=delta;
-	user.send({user:{coins:user.dbuser.coins}});
-	user.send({c:'table.userprofit', d:delta});
+	user.send({user:{coins:user.dbuser.coins}, muc:1, seq:1});
+	user.send({c:'table.userprofit', d:delta, muc:1, seq:1});
 }
 
 function parseWin(r) {

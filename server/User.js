@@ -100,6 +100,10 @@ class User extends EventEmitter {
 		ss('userin', {userid:this.dbuser._id, nick:this.dbuser.nickname});
 	};
 
+	toJSON() {
+		return JSON.stringify({id:this.id, nickname:this.nickname, face:this.face, coins:this.coins, level:this.level, offline:this.offline, showId:this.showId, profit:this.profit, bankerSets:this.bankerSets, setprofit:this.setprofit, memo:this.memo, total_set:u=this.dbuser.total_set});
+	}
+
 	static get pack_define() {return pack_define;}
 	static get default_user() {return default_user;}
 	
@@ -806,7 +810,7 @@ class User extends EventEmitter {
 				})
 			break;
 			case 'user.translog':
-				g_db.p.translog.find({id:self.id}).limit(100).sort({_t:-1}).toArray(function(err, arr) {
+				g_db.p.translog.find({id:self.id}).sort({_t:-1}).limit(100).toArray(function(err, arr) {
 					if (err) return self.senderr(err);
 					self.send({c:'user.translog', d:arr});
 				});
@@ -862,13 +866,31 @@ class User extends EventEmitter {
 					getDB(function(err, db, easym) {
 						if (err) return self.senderr(err);
 						if (user.coins<0) return self.senderr('用户分数异常，请联系技术');
+						var last_coins;
 						if (pack.coins<0 && user.coins+pack.coins<0) {
-							user.coins=0;
+							last_coins=0;
 							pack.coins=-user.coins;
 						}
-						else user.coins+=pack.coins;
-						db.adminlog.insert({time:new Date(), target:user.id, targetName:user.nickname, coins:pack.coins, operatorName:self.nickname, operator:self.id});
-						db.translog.insert({_t:new Date(), id:user.id, act:pack.coins>=0?'转入:活动赠送':'处罚',coins:pack.coins});
+						else last_coins=user.coins+pack.coins;
+						var now=new Date();
+						db.adminlog.insert({now, target:user.id, targetName:user.nickname, coins:pack.coins, operatorName:self.nickname, operator:self.id});
+						db.translog.insert({_t:now, id:user.id, act:pack.coins>=0?'转入:活动赠送':'处罚',coins:pack.coins});
+						var dr=db.dailyreport;
+						dr.count().then((_count)=> {
+							if (_count<1) {
+								return db.users.aggregate([{$group:{_id:null, tot:{$sum:{$add:['$coins', '$savedMoney']}}}}]).toArray((err, tot_r) =>{
+									if (err) return console.log(err);
+									dr.insert({time:now, totalcoins:tot_r[0].tot, profit:0, adminAdd:pack.coins});
+									user.coins=last_coins;
+								})
+							}
+							dr.find().skip(_count-1).toArray((err, r) => {
+								if (err) return console.log(err);
+								console.log(r[0]._id);
+								dr.update({_id:r[0]._id}, {$inc:{adminAdd:pack.coins}});
+								user.coins=last_coins;
+							});
+						})
 						self.send({c:'admin.addcoins', newcoin:user.coins});
 					});
 				});
@@ -884,15 +906,31 @@ class User extends EventEmitter {
 						if (user.savedMoney<0) return self.senderr('用户保险柜异常，请联系技术');
 						if (pack.coins<0) {
 							if (!user.savedMoney) return self.senderr('保险柜里没钱');
+							var last_saved;
 							if (user.savedMoney+pack.coins<0) {
-								user.savedMoney=0;
+								last_saved=0;
 								pack.coins=-user.savedMoney;
-							}else user.savedMoney+=pack.coins;
+							}else last_saved=user.savedMoney+pack.coins;
 						} 
-						else user.savedMoney+=pack.coins;
-						db.adminlog.insert({time:new Date(), target:user.id, targetName:user.nickname, coins:pack.coins, operatorName:self.nickname, operator:self.id, type:'保险柜'});
-						db.translog.insert({_t:new Date(), id:user.id, act:pack.coins>=0?'转入保险柜:活动赠送':'处罚:扣除保险柜',coins:pack.coins});
+						else last_saved=user.savedMoney+pack.coins;
+						var now=new Date();
+						db.adminlog.insert({time:now, target:user.id, targetName:user.nickname, coins:pack.coins, operatorName:self.nickname, operator:self.id, type:'保险柜'});
+						db.translog.insert({_t:now, id:user.id, act:pack.coins>=0?'转入保险柜:活动赠送':'处罚:扣除保险柜',coins:pack.coins});
 						self.send({c:'admin.addsaved', newcoin:user.savedMoney});
+						var dr=db.dailyreport;
+						dr.count().then((_count)=> {
+							if (_count<1) return db.users.aggregate([{$group:{_id:null, tot:{$sum:{$add:['$coins', '$savedMoney']}}}}]).toArray((err, tot_r) =>{
+								if (err) return console.log(err);
+								dr.insert({time:now, totalcoins:tot_r[0].tot, profit:0, adminAdd:pack.coins});
+								user.savedMoney=last_saved;
+							})
+
+							dr.find().skip(_count-1).toArray((err, r) => {
+								if (err) return console.log(err);
+								dr.update({_id:r[0]._id}, {$inc:{adminAdd:pack.coins}});
+								user.savedMoney=last_saved;
+							});
+						})
 					});
 				});
 			break;			
@@ -998,7 +1036,16 @@ class User extends EventEmitter {
 					self.send(merge({c:'admin.srv.ls'}, stat));
 				});		
 			break;
-		default:
+			case 'admin.srv.coinstat':
+				getDB((err, db, easym)=>{
+					if (err) return self.senderr(err);
+					db.dailyreport.find().sort({time:-1}).limit(100).toArray((err, r)=>{
+						if (err) return self.senderr(err);
+						self.send({c:'admin.srv.coinstat', items:r});
+					});
+				});
+			break;
+			default:
 				var isprocessed=this.emit(pack.c, pack, this);
 				if (this.table) isprocessed=this.table.msg(pack, this) || isprocessed;
 				if (!isprocessed) {
