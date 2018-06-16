@@ -509,7 +509,6 @@ class Baijiale extends TableBase {
 			user.lockedCoins=total_deal;
 		}
 		function handleCancelXiazhu(pack, user) {
-			return user.senderr('撤消被禁用了');
 			if (user==gd.playerBanker) return;
 			var deal=gd.deal[user.id];
 			if (!deal) return;
