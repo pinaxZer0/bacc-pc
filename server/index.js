@@ -161,7 +161,7 @@ module.exports=function msgHandler(db, createDbJson, wss) {
 	wss.on('connection', function connection(ws, req) {
 		ws.sendp=ws.sendjson=send;
 		ws.__ob=true;
-		ws.remoteAddress=req.headers['HTTP_CF_CONNECTING_IP']||req.headers['x-forwarded-for']||req.headers['X-Real-IP']||req.headers['x-real-ip']||req.connection.remoteAddress;
+		ws.remoteAddress=req.headers['cf-connecting-ip']||req.headers['x-forwarded-for']||req.headers['X-Real-IP']||req.headers['x-real-ip']||req.connection.remoteAddress;
 		debugout('someone in');
 
 		ws.on('message', function(data) {

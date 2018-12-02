@@ -140,9 +140,11 @@ if (argv.debugout) {
 	req.url=(p?p[1]:req.url)||'/';
 	next();
 });*/
+const chkhash=require('./checkhashtag.js');
+app.use(chkhash);
 app.use(compression());
-app.use(bodyParser.urlencoded({ extended: true, limit: '5mb' }));
 app.use(express.static(path.join(__dirname, 'bin'), { index: 'index.html' }));
+app.use(bodyParser.urlencoded({ extended: true, limit: '5mb' }));
 app.all('/apple/underReview', httpf(function () {
 	return { underReview: false };
 }));
