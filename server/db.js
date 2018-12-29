@@ -1,4 +1,4 @@
-var easym=require('easy-mongo')
+var easym=require('gy-easy-mongo')
   , argv =require('yargs')
 	.demand('mongo')
 	.describe('mongo', '--mongo=[mongodb://][usr:pwd@]ip[:port][,[usr:pwd@]ip[:port]]/db, 参考https://docs.mongodb.com/manual/reference/connection-string/')
@@ -17,7 +17,8 @@ module.exports=function (cb) {
 		{servers:{index:['order']}},
 		{games:{index:['user', 't'], capped:true, size:100*1024*1024, max:1000000}},
 		{adminlog:{index:['time', 'operatorName'], capped:true, size:100*1024*1024, max:1000000}},
-		{dailyreport:{index:['time'], capped:true, size:100*1024*1024, max:1000000}}
+		{dailyreport:{index:['time'], capped:true, size:100*1024*1024, max:1000000}},
+		{uclog:{index:['user' ,'_t'], capped:true, size:500*1024*1024, max:50000000}}
 		]}, function(err, db) {
 		if (err) return cb(err);
 		__stored_db=db;

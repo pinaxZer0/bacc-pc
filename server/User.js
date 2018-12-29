@@ -684,6 +684,14 @@ class User extends EventEmitter {
 				if (self.table && self.table.gamedata.playerBanker && self.table.gamedata.playerBanker==self) return self.senderr('坐庄时不能存钱');
 				if ((self.coins-(self.lockedCoins||0))<pack.coins) return self.senderr('现金不足');
 				g_db.p.depositlog.insert({_t:new Date(), act:'存入保险箱', coins:self.coins, lockedCoins:self.lockedCoins, savedMoney:self.savedMoney, change:-pack.coins, id:self.id});
+				g_db.p.uclog.insert({
+					user:self.id, 
+					snapshot:{total:self.dbuser.coins+self.dbuser.savedMoney, coins:self.dbuser.coins, savedMoney:self.dbuser.savedMoney, lockedCoins:self.lockedCoins}, 
+					delta:-pack.coins, 
+					desc:'存入保险箱', 
+					result:{total:self.dbuser.coins+self.dbuser.savedMoney, coins:self.dbuser.coins-pack.coins, savedMoney:self.dbuser.savedMoney+pack.coins, lockedCoins:self.lockedCoins},
+					_t:new Date()			
+				});
 				self.savedMoney+=pack.coins;
 				self.coins-=pack.coins;
 			break;
@@ -694,6 +702,14 @@ class User extends EventEmitter {
 				if (self.table && self.table.gamedata.playerBanker && self.table.gamedata.playerBanker==self) return self.senderr('坐庄时不能取钱');
 				if (self.savedMoney<pack.coins) return self.senderr('保险箱中没有那么多资金');
 				g_db.p.depositlog.insert({_t:new Date(), act:'提取现金', coins:self.coins, lockedCoins:self.lockedCoins, savedMoney:self.savedMoney, change:pack.coins, id:self.id});
+				g_db.p.uclog.insert({
+					user:self.id, 
+					snapshot:{total:self.dbuser.coins+self.dbuser.savedMoney, coins:self.dbuser.coins, savedMoney:self.dbuser.savedMoney, lockedCoins:self.lockedCoins}, 
+					delta:pack.coins, 
+					desc:'提取现金', 
+					result:{total:self.dbuser.coins+self.dbuser.savedMoney, coins:self.dbuser.coins+pack.coins, savedMoney:self.dbuser.savedMoney-pack.coins, lockedCoins:self.lockedCoins},
+					_t:new Date()			
+				});
 				self.savedMoney-=pack.coins;
 				self.coins+=pack.coins;
 			break;
@@ -739,11 +755,28 @@ class User extends EventEmitter {
 				if (pack.coins>this.savedMoney) return this.senderr('没有足够的金豆');
 				if (pack.target==this.showId) return this.senderr('不能转给自己');
 				if (self.table && self.table.gamedata.playerBanker && self.table.gamedata.playerBanker==self) return self.senderr('坐庄时不能转账');
+				self.savedMoney-=pack.coins;
 				User.fromShowID(pack.target, function(err, usr) {
 					if (err) return self.senderr(err);
 					g_db.p.translog.insert({_t:new Date(), act:'转出:'+usr.nickname+'('+usr.showId+')', coins:-pack.coins, id:self.id, target:usr.id, ip:self.ws.remoteAddress});
 					g_db.p.translog.insert({_t:new Date(), act:'转入:'+self.nickname+'('+self.showId+')', coins:pack.coins, id:usr.id, target:self.id, ip:self.ws.remoteAddress});
-					self.savedMoney-=pack.coins;
+					debugout(g_db.p);
+					g_db.p.uclog.insert({
+						user:self.id, 
+						snapshot:{total:self.dbuser.coins+self.dbuser.savedMoney, coins:self.dbuser.coins, savedMoney:self.dbuser.savedMoney, lockedCoins:self.lockedCoins}, 
+						delta:-pack.coins, 
+						desc:'转出:'+usr.nickname+'('+usr.showId+')', 
+						result:{total:self.dbuser.coins+self.dbuser.savedMoney-pack.coins, coins:self.dbuser.coins, savedMoney:self.dbuser.savedMoney-pack.coins, lockedCoins:self.lockedCoins},
+						_t:new Date()			
+					});
+					g_db.p.uclog.insert({
+						user:usr.id, 
+						snapshot:{total:usr.dbuser.coins+usr.dbuser.savedMoney, coins:usr.dbuser.coins, savedMoney:usr.dbuser.savedMoney, lockedCoins:usr.lockedCoins}, 
+						delta:pack.coins, 
+						desc:'转入:'+self.nickname+'('+self.showId+')', 
+						result:{total:usr.dbuser.coins+usr.dbuser.savedMoney+pack.coins, coins:usr.dbuser.coins, savedMoney:usr.dbuser.savedMoney+pack.coins, lockedCoins:usr.lockedCoins},
+						_t:new Date()			
+					});
 					usr.savedMoney+=pack.coins;
 					usr.send({c:'table.chat', nickname:'消息',str:'您的保险箱有一笔入账，请查收'});
 				});
@@ -875,6 +908,14 @@ class User extends EventEmitter {
 						var now=new Date();
 						db.adminlog.insert({now, target:user.id, targetName:user.nickname, coins:pack.coins, operatorName:self.nickname, operator:self.id});
 						db.translog.insert({_t:now, id:user.id, act:pack.coins>=0?'转入:活动赠送':'处罚',coins:pack.coins});
+						db.uclog.insert({
+							user:user.id, 
+							snapshot:{total:user.dbuser.coins+user.dbuser.savedMoney, coins:user.dbuser.coins, savedMoney:user.dbuser.savedMoney, lockedCoins:user.lockedCoins}, 
+							delta:pack.coins, 
+							desc:pack.coins>=0?'转入:活动赠送':'处罚', 
+							result:{total:user.dbuser.coins+user.dbuser.savedMoney+pack.coins, coins:user.dbuser.coins+pack.coins, savedMoney:user.dbuser.savedMoney, lockedCoins:user.lockedCoins},
+							_t:now
+						});
 						var dr=db.dailyreport;
 						dr.count().then((_count)=> {
 							if (_count<1) {
@@ -916,6 +957,14 @@ class User extends EventEmitter {
 						var now=new Date();
 						db.adminlog.insert({time:now, target:user.id, targetName:user.nickname, coins:pack.coins, operatorName:self.nickname, operator:self.id, type:'保险柜'});
 						db.translog.insert({_t:now, id:user.id, act:pack.coins>=0?'转入保险柜:活动赠送':'处罚:扣除保险柜',coins:pack.coins});
+						db.uclog.insert({
+							user:user.id, 
+							snapshot:{total:user.dbuser.coins+user.dbuser.savedMoney, coins:user.dbuser.coins, savedMoney:user.dbuser.savedMoney, lockedCoins:user.lockedCoins}, 
+							delta:pack.coins, 
+							desc:pack.coins>=0?'转入保险柜:活动赠送':'处罚:扣除保险柜', 
+							result:{total:user.dbuser.coins+last_saved, coins:user.dbuser.coins, savedMoney:last_saved, lockedCoins:user.lockedCoins},
+							_t:now
+						});
 						self.send({c:'admin.addsaved', newcoin:user.savedMoney});
 						var dr=db.dailyreport;
 						dr.count().then((_count)=> {

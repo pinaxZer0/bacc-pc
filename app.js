@@ -23,8 +23,11 @@ var server = require('http').createServer()
 		.demand('mongo')
 		.describe('mongo', '--mongo=[mongodb://][usr:pwd@]ip[:port][,[usr:pwd@]ip[:port]]/db, 参考https://docs.mongodb.com/manual/reference/connection-string/')
 		.describe('mysql', '--mysql=username[:password]@ip')
+		.default('authtimeout', 30*60*1000)
 		.argv;
-	
+
+const auth_timeout=argv.authtimeout;
+
 if (argv.dev) {
 	var chcp = require('cordova-hot-code-push-cli');
 	chcp.run();
@@ -544,6 +547,43 @@ getDB(function (err, db, easym) {
 			User.fromID(id, _retrieveUser); 
 		}
 		else User.fromShowID(id, _retrieveUser);
+	}));
+	var authedClients={};
+	function verifyAuth(req, res, next) {
+		if (!req.cookies || !req.cookies.a) return res.redirect('./login.html').end();
+		var auth=authedClients[req.cookies.a];
+		if (!auth) return res.redirect('./login.html').end();
+		var now=new Date();
+		if (auth.validUntil<now) {
+			delete authedClients[req.cookies.a]
+			return res.redirect('./login.html').end();
+		}
+		auth.validUntil=new Date(now.getTime()+auth_timeout);
+		req.auth=auth;
+		next();
+	}
+	function verifyAdmin(req, res, next) {
+		if (req.auth.isAdmin) return next();
+		res.send({err:'no right access'}).end();
+	}
+	// 23301
+	app.all('/gm/login', httpf({u:'string', p:'string', callback:true}, function(username, password, callback) {
+		var res=this.res;
+		db.users.find({_id:username}).limit(1).toArray(function(err, r) {
+			if (err) return callback(err);
+			if (r.length==0) return callback('用户名密码错');
+			if (r[0].password!==password) return callback('用户名密码错');
+			var now=new Date();
+			var rstr=randomstring()+now.getTime();
+			var o=authedClients[rstr]=r[0];
+			o.validUntil=new Date(now.getTime()+auth_timeout);
+			res.cookie('a',rstr, { maxAge: 900000});
+			return callback(null, {to:'./dashboard.html', token:rstr});
+		})
+	}));
+
+	app.all('/gm/kill', verifyAuth, verifyAdmin, httpf(()=>{
+
 	}));
 })
 

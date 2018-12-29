@@ -716,7 +716,7 @@ class Baijiale extends TableBase {
 		});
 		write_statistic.then(()=>{
 			debugout('after statistic');
-			if (banker_profit) modifyUserCoins(gd.playerBanker, banker_profit);
+			if (banker_profit) modifyUserCoins(gd.playerBanker, banker_profit, '坐庄');
 			// send user profit
 			for (var i=0; i<user_win_list.length; i++) {
 				var obj=user_win_list[i];
@@ -729,7 +729,7 @@ class Baijiale extends TableBase {
 				delta-=obj.lose;
 				var orgCoins=obj.user.coins;
 				obj.user.send({c:'setprofit', p:delta});
-				modifyUserCoins(obj.user, delta);
+				modifyUserCoins(obj.user, delta, '下注');
 				var newCoins=obj.user.coins;
 				var u=obj.deal.user;
 				obj.deal.user=undefined;
@@ -839,7 +839,15 @@ class Baijiale extends TableBase {
 	}
 }
 
-function modifyUserCoins(user, delta) {
+function modifyUserCoins(user, delta, desc) {
+	g_db.uclog.insert({
+		user:user.id, 
+		snapshot:{total:user.dbuser.coins+user.dbuser.savedMoney, coins:user.dbuser.coins, savedMoney:user.dbuser.savedMoney, lockedCoins:user.lockedCoins}, 
+		delta:delta, 
+		desc:desc, 
+		result:{total:user.dbuser.coins+user.dbuser.savedMoney+delta, coins:user.dbuser.coins+delta, savedMoney:user.dbuser.savedMoney, lockedCoins:user.lockedCoins},
+		_t:new Date()
+	})
 	user.dbuser.coins+=delta;
 	user.send({user:{coins:user.dbuser.coins}, muc:1, seq:1});
 	user.send({c:'table.userprofit', d:delta, muc:1, seq:1});
