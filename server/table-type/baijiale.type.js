@@ -570,12 +570,14 @@ class Baijiale extends TableBase {
 		var self=this, gd=this.gamedata;
 		var r=gd.his[gd.his.length-1];
 		// 把下注信息也存起来
-		r.deal={zhuang:{}, xian:{}, he:{}};
+		r.deal={zhuang:{}, xian:{}, he:{}, zhuangDui:{}, xianDui:{}};
 		for (var id in gd.deal) {
 			var d=gd.deal[id];
 			if (d.zhuang) r.deal.zhuang[id]=d.zhuang;
 			if (d.xian) r.deal.xian[id]=d.xian;
 			if (d.he) r.deal.he[id]=d.he;
+			if (d.zhuangDui) r.deal.zhuangDui[id]=d.zhuangDui;
+			if (d.xianDui) r.deal.xianDui[id]=d.xianDui;
 		}
 		var winArr=[], loseArr, tieArr=[];
 		if (r.win=='tie') {
@@ -650,7 +652,7 @@ class Baijiale extends TableBase {
 		if (this.isPlayerBanker()) {
 			updObj.seats[gd.playerBanker.id]={user:gd.playerBanker};
 			if (profit>0) {
-				r.deal[parseWin(r)][gd.playerBanker.id]='playerBanker';
+				// r.deal[parseWin(r)][gd.playerBanker.id]='playerBanker';
 				var p=Math.round(profit*waterRatio);
 				water+=(profit-p);
 				// 如果是人的庄,抽水后给他
@@ -714,9 +716,27 @@ class Baijiale extends TableBase {
 				});
 			})	
 		});
+
 		write_statistic.then(()=>{
+			return new Promise((resolve, reject)=>{
+				try {
+					var _r=clone(r);
+					_r.playerBanker=gd.playerBanker && gd.playerBanker.id;
+					_r.t=now;
+					g_db.games.insert(_r, {w:1}).then(res=>{
+						resolve(res.insertedIds[0].toHexString());
+					}).catch(e=>{
+						console.log(e);
+						resolve();
+					})
+				} catch(e) {
+					console.log(e);
+					resolve();
+				}
+			})
+		}).then((gamestatid)=>{
 			debugout('after statistic');
-			if (banker_profit) modifyUserCoins(gd.playerBanker, banker_profit, '坐庄');
+			if (banker_profit) modifyUserCoins(gd.playerBanker, banker_profit, '坐庄', gamestatid);
 			// send user profit
 			for (var i=0; i<user_win_list.length; i++) {
 				var obj=user_win_list[i];
@@ -729,14 +749,14 @@ class Baijiale extends TableBase {
 				delta-=obj.lose;
 				var orgCoins=obj.user.coins;
 				obj.user.send({c:'setprofit', p:delta});
-				modifyUserCoins(obj.user, delta, '下注');
+				modifyUserCoins(obj.user, delta, '下注', gamestatid);
 				var newCoins=obj.user.coins;
 				var u=obj.deal.user;
 				obj.deal.user=undefined;
-				g_db.games.insert({user:obj.user.id, deal:obj.deal, r:r, oldCoins:orgCoins, newCoins:newCoins, t:now});
 				debugout('user score'.cyan, delta, obj.user.coins);
 				obj.deal.user=u;
 			}
+			// g_db.games.insert(merge(r, {playerBanker:gd.playerBanker, t:now}));
 			gd.setnum++;
 			for (var i in updObj.seats) {
 				var seat=gd.seats[i];
@@ -839,15 +859,17 @@ class Baijiale extends TableBase {
 	}
 }
 
-function modifyUserCoins(user, delta, desc) {
-	g_db.uclog.insert({
+function modifyUserCoins(user, delta, desc, gameid) {
+	var insertObj={
 		user:user.id, 
 		snapshot:{total:user.dbuser.coins+user.dbuser.savedMoney, coins:user.dbuser.coins, savedMoney:user.dbuser.savedMoney, lockedCoins:user.lockedCoins}, 
 		delta:delta, 
 		desc:desc, 
 		result:{total:user.dbuser.coins+user.dbuser.savedMoney+delta, coins:user.dbuser.coins+delta, savedMoney:user.dbuser.savedMoney, lockedCoins:user.lockedCoins},
 		_t:new Date()
-	})
+	};
+	gameid && (insertObj.gameid=gameid);
+	g_db.uclog.insert(insertObj);
 	user.dbuser.coins+=delta;
 	user.send({user:{coins:user.dbuser.coins}, muc:1, seq:1});
 	user.send({c:'table.userprofit', d:delta, muc:1, seq:1});

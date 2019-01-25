@@ -112,13 +112,13 @@ class User extends EventEmitter {
 			cb=proj;
 			proj=null;
 		}
-		if (typeof userid=='string') {
-			var user=onlineUsers.get(userid);
-			if (user) return cb(null, user, true);
-		}
+		var user=onlineUsers.get(userid);
+		if (user) return cb(null, user, true);
 		getDB(function(err, db, easym) {
 			easym.createDbJson(db, {col:db.users, key:userid, default:default_user,projection:proj}, function(err, dbu) {
 				if (err) return cb(err);
+				var onlineuser=onlineUsers.get(dbu._id);
+				if (onlineuser) return cb(null, onlineuser, true);
 				cb(null, new User({sendp:function(){}}, dbu), false);
 			});
 		})
@@ -745,6 +745,51 @@ class User extends EventEmitter {
 					});
 				})
 			break;
+			case 'usercoinlog':
+			((cb)=>{
+				if (pack.id) return User.fromShowID(pack.id, cb);
+				if (pack.nickname) return User.fromNickname(pack.nickname, cb);
+				self.senderr('必须指定id或者nickname');
+			})((err, user)=>{
+				if (err) return self.senderr(err);
+				getDB((err, db)=>{
+					if (err) return self.senderr(err);
+					var query={user:user.id};
+					if (pack.start) query._t={$gte:new Date(pack.start)};
+					if (pack.end) {
+						if (query._t) query._t.$lte=new Date(pack.end);
+						else query._t={$lte:new Date(pack.end)}
+					}
+					var cur=db.uclog.find(query);
+					if (!pack.start && !pack.end) cur=cur.limit(100); 
+					cur.sort({_t:-1}).toArray((err, r)=>{
+						if (err) return self.senderr(err);
+						var gameids=[];
+						r.forEach((log)=>{
+							if (log.gameid) gameids.push(ObjectID(log.gameid));
+						});
+						if (gameids.length) {
+							// joined from games
+							db.games.find({_id:{$in:gameids}}).toArray((err, g)=>{
+								if (err) return self.senderr(err);
+								debugout(g);
+								var mapOfGames={};
+								g.forEach((item)=>{
+									mapOfGames[item._id.toHexString()]=item;
+								});
+								r.forEach((log)=>{
+									if (log.gameid && mapOfGames[log.gameid]) log.game=mapOfGames[log.gameid];
+								})
+								debugout(r);
+								self.send({c:'usercoinlog', data:r, nickname:user.nickname, showId:user.showId});
+							})
+						} else {
+							self.send({c:'usercoinlog', data:r, nickname:user.nickname, showId:user.showId});
+						}
+					});
+				});
+			})
+			break;
 			case 'coins.transfer':
 				//chk pwd
 				if (!pack.pwd) return this.senderr('参数有误');
@@ -752,21 +797,24 @@ class User extends EventEmitter {
 				if (isNaN(pack.coins)) return self.senderr('参数有误');
 				pack.coins=Number(pack.coins);
 				if (pack.coins<=0) return self.senderr('金豆数量不对');
-				if (pack.coins>this.savedMoney) return this.senderr('没有足够的金豆');
 				if (pack.target==this.showId) return this.senderr('不能转给自己');
 				if (self.table && self.table.gamedata.playerBanker && self.table.gamedata.playerBanker==self) return self.senderr('坐庄时不能转账');
-				self.savedMoney-=pack.coins;
+				var snapshot_savedMoney=self.savedMoney;
 				User.fromShowID(pack.target, function(err, usr) {
 					if (err) return self.senderr(err);
+					if (pack.coins>self.savedMoney) return self.senderr('没有足够的金豆');
+					self.savedMoney-=pack.coins;
+					usr.savedMoney+=pack.coins;
+					usr.send({c:'table.chat', nickname:'消息',str:'您的保险箱有一笔入账，请查收'});
+
 					g_db.p.translog.insert({_t:new Date(), act:'转出:'+usr.nickname+'('+usr.showId+')', coins:-pack.coins, id:self.id, target:usr.id, ip:self.ws.remoteAddress});
 					g_db.p.translog.insert({_t:new Date(), act:'转入:'+self.nickname+'('+self.showId+')', coins:pack.coins, id:usr.id, target:self.id, ip:self.ws.remoteAddress});
-					debugout(g_db.p);
 					g_db.p.uclog.insert({
 						user:self.id, 
-						snapshot:{total:self.dbuser.coins+self.dbuser.savedMoney, coins:self.dbuser.coins, savedMoney:self.dbuser.savedMoney, lockedCoins:self.lockedCoins}, 
+						snapshot:{total:self.dbuser.coins+self.dbuser.savedMoney, coins:self.dbuser.coins, savedMoney:snapshot_savedMoney, lockedCoins:self.lockedCoins}, 
 						delta:-pack.coins, 
 						desc:'转出:'+usr.nickname+'('+usr.showId+')', 
-						result:{total:self.dbuser.coins+self.dbuser.savedMoney-pack.coins, coins:self.dbuser.coins, savedMoney:self.dbuser.savedMoney-pack.coins, lockedCoins:self.lockedCoins},
+						result:{total:self.dbuser.coins+self.dbuser.savedMoney-pack.coins, coins:self.dbuser.coins, savedMoney:snapshot_savedMoney-pack.coins, lockedCoins:self.lockedCoins},
 						_t:new Date()			
 					});
 					g_db.p.uclog.insert({
@@ -777,8 +825,6 @@ class User extends EventEmitter {
 						result:{total:usr.dbuser.coins+usr.dbuser.savedMoney+pack.coins, coins:usr.dbuser.coins, savedMoney:usr.dbuser.savedMoney+pack.coins, lockedCoins:usr.lockedCoins},
 						_t:new Date()			
 					});
-					usr.savedMoney+=pack.coins;
-					usr.send({c:'table.chat', nickname:'消息',str:'您的保险箱有一笔入账，请查收'});
 				});
 			break;
 			case 'user.setnickname':
